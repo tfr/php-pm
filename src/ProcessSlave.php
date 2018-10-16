@@ -386,7 +386,12 @@ class ProcessSlave
 
         $catchLog = function ($e) {
             console_log((string) $e);
-            return new Response(500);
+            $body = '';
+            if($this->isDebug()) {
+                $body = sprintf("[%s] Error: %s\n%s\n", __METHOD__, $e->getMessage(), $e->getTraceAsString());
+            }
+
+            return new Response(500, [], $body);
         };
 
         try {

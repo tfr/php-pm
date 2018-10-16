@@ -12,6 +12,13 @@ class StartCommand extends Command
 {
     use ConfigTrait;
 
+    private $loader;
+    public function __construct($name = null, $loader = '') {
+        parent::__construct($name);
+
+        $this->loader = $loader;
+    }
+
     /**
      * {@inheritdoc}
      */
@@ -49,6 +56,7 @@ class StartCommand extends Command
         $handler->setPIDFile($config['pidfile']);
         $handler->setPopulateServer($config['populate-server-var']);
         $handler->setStaticDirectory($config['static-directory']);
+        $handler->setLoader($this->loader);
         $handler->run();
 
         return null;

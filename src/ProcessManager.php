@@ -217,6 +217,8 @@ class ProcessManager
      */
     protected $pidfile;
 
+    protected $loaderFile;
+
     /**
      * Controller port
      */
@@ -477,6 +479,20 @@ class ProcessManager
     public function setReloadTimeout($reloadTimeout)
     {
         $this->reloadTimeout = $reloadTimeout;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getLoaderFile() {
+        return $this->loaderFile;
+    }
+
+    /**
+     * @param mixed $loaderFile
+     */
+    public function setLoader($loaderFile) {
+        $this->loaderFile = $loaderFile;
     }
 
     /**
@@ -1180,7 +1196,6 @@ class ProcessManager
 
         $config = var_export($config, true);
 
-        $dir = var_export(__DIR__ . '/..', true);
         $script = <<<EOF
 <?php
 
@@ -1188,9 +1203,12 @@ namespace PHPPM;
 
 set_time_limit(0);
 
-require_once file_exists($dir . '/vendor/autoload.php')
-    ? $dir . '/vendor/autoload.php'
-    : $dir . '/../../autoload.php';
+function _slave_execption_handler(\$e) {
+    \$logMessage = sprintf("Error: %s\n%s\n", \$e->getMessage(), \$e->getTraceAsString());
+    error_log(\$logMessage);
+}
+
+require_once '{$this->loaderFile}';
     
 if (!pcntl_installed()) {
     error_log(
