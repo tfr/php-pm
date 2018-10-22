@@ -954,7 +954,7 @@ class ProcessManager
                 $this->filesLastMTime[$filePath] = $actualFileTime;
 
                 $this->output->writeln(
-                    sprintf("<info>[%s] File %s has changed.</info>", date('d/M/Y:H:i:s O'), $filePath)
+                    sprintf("<info>[%s] File %s has changed.</info>", @date('d/M/Y:H:i:s O'), $filePath)
                 );
                 $hasChanged = true;
                 break;
@@ -1199,18 +1199,18 @@ class ProcessManager
         $script = <<<EOF
 <?php
 
-namespace PHPPM;
+use PHPPM\ProcessSlave;
 
 set_time_limit(0);
 
-function _slave_execption_handler(\$e) {
-    \$logMessage = sprintf("Error: %s\n%s\n", \$e->getMessage(), \$e->getTraceAsString());
+function _log_execption(\$e) {
+    \$logMessage = sprintf("Error: %s\\nstack:\\n%s ", \$e->getMessage(), \$e->getTraceAsString());
     error_log(\$logMessage);
 }
 
 require_once '{$this->loaderFile}';
     
-if (!pcntl_installed()) {
+if (!PHPPM\pcntl_installed()) {
     error_log(
         sprintf(
             'PCNTL is not enabled in the PHP installation at %s. See: http://php.net/manual/en/pcntl.installation.php',
@@ -1220,18 +1220,25 @@ if (!pcntl_installed()) {
     exit();
 }
 
-if (!pcntl_enabled()) {
+if (!PHPPM\pcntl_enabled()) {
     error_log('Some required PCNTL functions are disabled. Check `disabled_functions` in `php.ini`.');
     exit();
 }
-
-//global for all global functions
-ProcessSlave::\$slave = new ProcessSlave($socketpath, $bridge, $bootstrap, $config);
-ProcessSlave::\$slave->run();
+try {
+    //global for all global functions
+    ProcessSlave::\$slave = new ProcessSlave($socketpath, $bridge, $bootstrap, $config);
+    ProcessSlave::\$slave->run();
+} catch (\Throwable \$t) {
+    // PHP >= 7.0
+    _log_execption(\$t);
+} catch (\Exception \$e) {
+    // PHP < 7.0
+    _log_execption(\$t);
+}
 EOF;
 
         // slave php file
-        $file = tempnam(sys_get_temp_dir(), 'dbg');
+        $file = tempnam(sys_get_temp_dir(), 'dbg') . "-ppm-slave.php";
         file_put_contents($file, $script);
         register_shutdown_function('unlink', $file);
 

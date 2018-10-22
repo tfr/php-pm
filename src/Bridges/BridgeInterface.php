@@ -13,5 +13,5 @@ interface BridgeInterface extends RequestHandlerInterface
      * @param string $appenv
      * @param boolean $debug If debug is enabled
      */
-    public function bootstrap($appBootstrap, $appenv, $debug);
+    public function bootstrap($appBootstrap, $appenv, $debug, \Symfony\Component\Debug\BufferingLogger $logger);
 }

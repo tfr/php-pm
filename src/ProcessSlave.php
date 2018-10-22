@@ -18,7 +18,9 @@ use React\Socket\ServerInterface;
 use React\Socket\UnixConnector;
 use React\Socket\UnixServer;
 use React\Stream\ReadableResourceStream;
+use Symfony\Component\Debug\Debug;
 use Symfony\Component\Debug\ErrorHandler;
+use Symfony\Component\Debug\ExceptionHandler;
 
 class ProcessSlave
 {
@@ -248,7 +250,7 @@ class ProcessSlave
     protected function bootstrap($appBootstrap, $appenv, $debug)
     {
         if ($bridge = $this->getBridge()) {
-            $bridge->bootstrap($appBootstrap, $appenv, $debug);
+            $bridge->bootstrap($appBootstrap, $appenv, $debug, $this->errorLogger);
             $this->sendMessage($this->controller, 'ready');
         }
     }
@@ -346,8 +348,8 @@ class ProcessSlave
         $this->loop = Factory::create();
 
         $this->errorLogger = BufferingLogger::create();
-        ErrorHandler::register(new ErrorHandler($this->errorLogger));
-
+////        ErrorHandler::register(new ErrorHandler($this->errorLogger));
+//        Debug::enable();
         $this->tryConnect();
         $this->loop->run();
     }
@@ -382,7 +384,7 @@ class ProcessSlave
         $request = $request->withAttribute('remote_address', $remoteIp);
         $request = $request->withAttribute('remote_port', $remotePort);
 
-        $logTime = date('d/M/Y:H:i:s O');
+        $logTime = @date('d/M/Y:H:i:s O');
 
         $catchLog = function ($e) {
             console_log((string) $e);
@@ -399,6 +401,7 @@ class ProcessSlave
         } catch (\Throwable $t) {
             // PHP >= 7.0
             $response = $catchLog($t);
+
         } catch (\Exception $e) {
             // PHP < 7.0
             $response = $catchLog($e);
@@ -438,7 +441,7 @@ class ProcessSlave
                 $response = $bridge->handle($request);
             } catch (\Throwable $t) {
                 // PHP >= 7.0
-                error_log(
+                @error_log(
                     'An exception was thrown by the bridge. Forcing restart of the worker. The exception was: ' .
                     (string)$t
                 );
@@ -448,7 +451,7 @@ class ProcessSlave
                 $this->shutdown();
             } catch (\Exception $e) {
                 // PHP < 7.0
-                error_log(
+                @error_log(
                     'An exception was thrown by the bridge. Forcing restart of the worker. The exception was: ' .
                     (string)$e
                 );
@@ -466,7 +469,7 @@ class ProcessSlave
             //when a script sent headers the cgi process needs to die because the second request
             //trying to send headers again will fail (headers already sent fatal). Its best to not even
             //try to send headers because this break the whole approach of php-pm using php-cgi.
-            error_log(
+            @error_log(
                 'Headers have been sent, but not redirected to client. Forcing restart of the worker. ' .
                 'Make sure your application does not send headers on its own.'
             );
@@ -606,7 +609,11 @@ class ProcessSlave
                 $message = "<error>$message</error>";
             }
 
-            $this->sendMessage($this->controller, 'log', ['message' => $message]);
+            $serverParams = $request->getServerParams();
+            $requestTime = $serverParams['REQUEST_TIME_FLOAT'];
+            $elapsed = intval((microtime(true) - $requestTime) * 1000);
+
+            $this->sendMessage($this->controller, 'log', ['message' => $message . "({$elapsed} ms)"]);
         };
 
         if ($response->getBody() instanceof EventEmitterInterface) {
